@@ -1,31 +1,110 @@
-#include <glad\glad.h>
-#include "sdl.h"
+#include "pch.h"
+#include "Engine/Engine.h"
+#include "Engine/Graphics/VertexIndexArray.h"
 
 int main(int argc, char** argv)
 {
-	int result = SDL_Init(SDL_INIT_VIDEO);
-	if (result != 0)
+	nc::Engine engine;
+	engine.Startup();
+
+	/*nc::Renderer renderer;
+	renderer.Startup();
+	renderer.Create("OpenGL", 800, 600);*/
+
+	//initialization
+	//TRIANGLE
+	//float vertices[] =
+	//{
+	//	-0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, //point 1
+	//	 0.0f,  0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 0.5f, 1.0f, //point 2
+	//	 0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, //point 3
+	//};
+
+	//RECTANGLE
+	static float vertices[] = {
+		// front
+		-1.0f, -1.0f,  1.0f, 0.0f, 0.0f,
+		 1.0f, -1.0f,  1.0f, 1.0f, 0.0f,
+		 1.0f,  1.0f,  1.0f, 1.0f, 1.0f,
+		-1.0f,  1.0f,  1.0f, 0.0f, 1.0f,
+		// back
+		-1.0f, -1.0f, -1.0f, 1.0f, 0.0f,
+		 1.0f, -1.0f, -1.0f, 0.0f, 0.0f,
+		 1.0f,  1.0f, -1.0f, 0.0f, 1.0f,
+		-1.0f,  1.0f, -1.0f, 1.0f, 1.0f,
+	};
+
+	static GLushort indices[] =
 	{
-		SDL_Log("Unable to initialize SDL: %s", SDL_GetError());
-	}
+		// front
+		0, 1, 2,
+		2, 3, 0,
+		// right
+		1, 5, 6,
+		6, 2, 1,
+		// back
+		7, 6, 5,
+		5, 4, 7,
+		// left
+		4, 0, 3,
+		3, 7, 4,
+		// bottom
+		4, 5, 1,
+		1, 0, 4,
+		// top
+		3, 2, 6,
+		6, 7, 3
+	};
 
-	SDL_Window* window = SDL_CreateWindow("OpenGL", 100, 100, 800, 600, SDL_WINDOW_OPENGL);
-	if (window == nullptr)
-	{
-		SDL_Log("Failed to create window: %s", SDL_GetError());
-	}
+	nc::Program program;
+	program.CreateShaderFromFile("shaders\\basic.vert", GL_VERTEX_SHADER);
+	program.CreateShaderFromFile("shaders\\basic.frag", GL_FRAGMENT_SHADER);
+	program.Link();
+	program.Use();
 
-	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-	SDL_GL_SetAttribute(SDL_GL_ACCELERATED_VISUAL, 1);
-	SDL_GL_SetSwapInterval(1);
+	nc::VertexIndexArray vertexArray;
+	vertexArray.Create("vertex");
+	vertexArray.CreateBuffer(sizeof(vertices), sizeof(vertices) / (sizeof(float) * 5), vertices);
+	vertexArray.SetAttribute(0, 3 , 5 * sizeof(float), 0);
+	vertexArray.SetAttribute(1, 2 , 5 * sizeof(float), 3 * sizeof(float));
+	vertexArray.CreateIndexBuffer(GL_UNSIGNED_SHORT, sizeof(indices) / sizeof(GLushort), indices);
 
-	SDL_GLContext context = SDL_GL_CreateContext(window);
-	if (!gladLoadGL())
-	{
-		SDL_Log("Failed to create OpenGL context");
-		exit(-1);
-	}
+	//////create vertex buffers
+	//GLuint vbo;
+	//glGenBuffers(1, &vbo);
+	//glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	//glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
+	////set position pipeline (vertex attrubute)
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), 0);
+	glEnableVertexAttribArray(0);
+
+	////set color pipeline(vertex attribute)
+	/*glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+	glEnableVertexAttribArray(1);*/
+
+	////set uv pipeline(vertex attribute)
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+	glEnableVertexAttribArray(1);
+
+	vertexArray.CreateIndexBuffer(GL_UNSIGNED_SHORT, sizeof(indices) / sizeof(GLushort), indices);
+	////create index buffers
+	//GLuint ibo;
+	//glGenBuffers(1, &ibo);
+	//glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
+	//glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+	//uniform
+	glm::mat4 model = glm::mat4(1.0f);
+	
+
+	glm::mat4 projection = glm::perspective(glm::radians(45.0f), 800 / 600.0f, 0.01f, 1000.0f);
+
+	glm::vec3 eye{0, 0, 5};
+	glm::mat4 view = glm::lookAt(eye, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+
+	nc::Texture texture;
+	texture.CreateTexture("textures\\llama.jpg");
 
 	bool quit = false;
 	while (!quit)
@@ -46,23 +125,55 @@ int main(int argc, char** argv)
 		}
 
 		SDL_PumpEvents();
+		engine.Update();
 
-		glClearColor(0.85f, 0.85f, 0.85f, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT);
+		float angle = 0;
+		if (engine.GetSystem<nc::InputSystem>()->GetButtonState(SDL_SCANCODE_E) == nc::InputSystem::eButtonState::HELD)
+		{
+			angle = 2.0f;
+		}
+		if (engine.GetSystem<nc::InputSystem>()->GetButtonState(SDL_SCANCODE_Q) == nc::InputSystem::eButtonState::HELD)
+		{
+			angle = -2.0f;
+		}
+		model = glm::rotate(model, angle * engine.GetTimer().DeltaTime(), glm::vec3(0, 1, 0));
+		
 
-		glBegin(GL_TRIANGLES);
+		if (engine.GetSystem<nc::InputSystem>()->GetButtonState(SDL_SCANCODE_A) == nc::InputSystem::eButtonState::HELD)
+		{
+			eye.x -= 4 * engine.GetTimer().DeltaTime();
+		}
+		if (engine.GetSystem<nc::InputSystem>()->GetButtonState(SDL_SCANCODE_D) == nc::InputSystem::eButtonState::HELD)
+		{
+			eye.x += 4 * engine.GetTimer().DeltaTime();
+		}
+		if (engine.GetSystem<nc::InputSystem>()->GetButtonState(SDL_SCANCODE_W) == nc::InputSystem::eButtonState::HELD)
+		{
+			eye.z -= 4 * engine.GetTimer().DeltaTime();
+		}
+		if (engine.GetSystem<nc::InputSystem>()->GetButtonState(SDL_SCANCODE_S) == nc::InputSystem::eButtonState::HELD)
+		{
+			eye.z += 4 * engine.GetTimer().DeltaTime();
+		}
+		view = glm::lookAt(eye, eye + glm::vec3(0, 0, -1), glm::vec3(0, 1, 0));
 
-		glColor3f(1.0f, 0.0f, 0.0f);
-		glVertex2f(-0.5f, -0.5f);
-		glColor3f(0.0f, 1.0f, 0.0f);
-		glVertex2f(0.0f, 0.5f);
-		glColor3f(0.0f, 0.0f, 1.0f);
-		glVertex2f(0.5f, -0.5f);
+		glm::mat4 mvp = projection * view * model;
+		program.SetUniform("transform", mvp);
 
-		glEnd();
+		engine.GetSystem<nc::Renderer>()->BeginFrame();
+		//renderer.BeginFrame();
 
-		SDL_GL_SwapWindow(window);
+		//render triangle
+		/*glDrawArrays(GL_TRIANGLES, 0, 3);*/
+		vertexArray.Draw();
+		GLsizei numElements = sizeof(indices) / sizeof(GLushort);
+		glDrawElements(GL_TRIANGLES, numElements, GL_UNSIGNED_SHORT, 0);
+
+		engine.GetSystem<nc::Renderer>()->EndFrame();
+		//renderer.EndFrame();
 	}
+
+	engine.Shutdown();
 
 	return 0;
 }
